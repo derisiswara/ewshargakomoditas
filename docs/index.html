@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>EWS Harga Komoditas — ALPS Dashboard</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+  onload="renderMathInElement(document.body,{delimiters:[{left:'$$',right:'$$',display:true},{left:'$',right:'$',display:false}]});"></script>
+<style>
+:root {
+  --alps-normal: #22c55e;
+  --alps-stress: #eab308;
+  --alps-alert: #f97316;
+  --alps-crisis: #ef4444;
+}
+body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #f8fafc; color: #1e293b; }
+
+/* Navbar */
+.navbar-alps { background: #0f172a; border-bottom: 3px solid #3b82f6; }
+.navbar-alps .navbar-brand { font-weight: 800; letter-spacing: -0.02em; color: #fff; font-size: 1.1rem; }
+.navbar-alps .nav-link { color: #94a3b8 !important; font-weight: 500; font-size: 0.92rem; }
+.navbar-alps .nav-link.active, .navbar-alps .nav-link:hover { color: #fff !important; }
+
+/* Scorecards */
+.score-card {
+  border-radius: 12px; padding: 22px 16px; text-align: center;
+  background: #fff; border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+.score-card .val { font-size: 2.6rem; font-weight: 800; line-height: 1.1; }
+.score-card .lbl { font-size: 0.88rem; color: #64748b; margin-top: 4px; font-weight: 500; }
+.score-card .pct { font-size: 0.9rem; color: #94a3b8; }
+.card-normal { border-left: 5px solid var(--alps-normal); }
+.card-stress { border-left: 5px solid var(--alps-stress); }
+.card-alert  { border-left: 5px solid var(--alps-alert); }
+.card-crisis { border-left: 5px solid var(--alps-crisis); }
+
+/* Sections */
+.section-title {
+  font-size: 1.05rem; font-weight: 700; color: #1e293b;
+  margin: 28px 0 10px; padding-bottom: 8px; border-bottom: 2px solid #e2e8f0;
+}
+.filter-bar {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 16px 20px; margin-bottom: 20px;
+}
+.filter-bar label { font-weight: 600; font-size: 0.82rem; color: #64748b; margin-bottom: 2px; }
+.filter-bar select { font-size: 0.9rem; }
+
+/* Legend */
+.legend-bar { display: flex; gap: 14px; flex-wrap: wrap; font-size: 0.82rem; color: #475569; margin: 10px 0; }
+.swatch { display: inline-block; width: 15px; height: 15px; border-radius: 3px; vertical-align: middle; margin-right: 3px; }
+
+/* Chart containers */
+.chart-box {
+  background: #fff; border: 1px solid #e2e8f0; border-radius: 10px;
+  padding: 16px; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+}
+
+/* Summary table */
+.summary-tbl { font-size: 0.9rem; }
+.summary-tbl th { background: #f8fafc; }
+
+/* Badge */
+.badge-alps { font-size: 0.78rem; font-weight: 600; padding: 3px 10px; border-radius: 10px; color: #fff; }
+.badge-Normal { background: var(--alps-normal); }
+.badge-Stress { background: var(--alps-stress); color: #1e293b; }
+.badge-Alert  { background: var(--alps-alert); }
+.badge-Crisis { background: var(--alps-crisis); }
+
+/* Tile map */
+.tile-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(115px, 1fr)); gap: 5px; }
+.tile-cell {
+  border-radius: 7px; padding: 8px 4px; text-align: center;
+  font-size: 0.72rem; font-weight: 600; color: #fff;
+  min-height: 52px; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; cursor: default;
+  transition: transform 0.1s;
+}
+.tile-cell:hover { transform: scale(1.04); box-shadow: 0 2px 8px rgba(0,0,0,0.15); }
+.tile-cell .sc { font-size: 0.66rem; opacity: 0.85; }
+
+.korwil-label { font-weight: 700; font-size: 0.85rem; color: #475569; margin: 14px 0 5px; }
+
+/* Methodology */
+.method-box { background: #fff; border: 1px solid #e2e8f0; border-radius: 10px; padding: 28px 32px; line-height: 1.8; }
+.method-box h5 { font-weight: 700; margin-top: 20px; }
+
+/* Footer */
+.footer-alps { background: #f1f5f9; border-top: 1px solid #e2e8f0; padding: 14px 0; font-size: 0.8rem; color: #94a3b8; text-align: center; }
+
+/* Download btn */
+.btn-dl { font-size: 0.85rem; }
+
+/* Tab content needs min-height */
+.tab-pane { min-height: 400px; padding-top: 20px; }
+
+/* Loading overlay */
+#loading {
+  position: fixed; inset: 0; background: #fff; z-index: 9999;
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 12px;
+}
+#loading .spinner-border { width: 3rem; height: 3rem; color: #3b82f6; }
+</style>
+</head>
+<body>
+
+<!-- Loading -->
+<div id="loading">
+  <div class="spinner-border" role="status"></div>
+  <div style="font-weight:600;color:#64748b;">Memuat data ALPS...</div>
+</div>
+
+<!-- Navbar -->
+<nav class="navbar navbar-expand-lg navbar-alps sticky-top">
+  <div class="container-fluid px-3">
+    <a class="navbar-brand" href="#">
+      <i class="bi bi-graph-up-arrow me-2"></i>EWS Harga — ALPS Dashboard
+    </a>
+    <button class="navbar-toggler border-secondary" type="button" data-bs-toggle="collapse" data-bs-target="#navMain">
+      <i class="bi bi-list text-white fs-4"></i>
+    </button>
+    <div class="collapse navbar-collapse" id="navMain">
+      <ul class="navbar-nav ms-auto" id="mainTabs" role="tablist">
+        <li class="nav-item"><a class="nav-link active" data-bs-toggle="tab" href="#tab1" role="tab">Ringkasan Nasional</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab2" role="tab">Detail Provinsi-Komoditas</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab3" role="tab">Perbandingan</a></li>
+        <li class="nav-item"><a class="nav-link" data-bs-toggle="tab" href="#tab4" role="tab">Metodologi</a></li>
+      </ul>
+      <a href="alps_output.csv" download class="btn btn-sm btn-outline-light ms-lg-3 mt-2 mt-lg-0"><i class="bi bi-download me-1"></i>CSV</a>
+    </div>
+  </div>
+</nav>
+
+<!-- Tab Content -->
+<div class="container-fluid px-3 px-lg-4" style="max-width:1280px; margin:auto;">
+<div class="tab-content">
+
+<!-- ==================== TAB 1: Ringkasan Nasional ==================== -->
+<div class="tab-pane fade show active" id="tab1" role="tabpanel">
+
+  <!-- Filters -->
+  <div class="filter-bar">
+    <div class="row g-3 align-items-end">
+      <div class="col-auto">
+        <label>Periode</label>
+        <select id="f1Period" class="form-select form-select-sm"></select>
+      </div>
+      <div class="col-auto">
+        <label>Jenis Pasar</label>
+        <select id="f1Pasar" class="form-select form-select-sm">
+          <option value="Semua">Semua</option>
+          <option value="Pasar Tradisional">Pasar Tradisional</option>
+          <option value="Pasar Modern">Pasar Modern</option>
+        </select>
+      </div>
+      <div class="col-auto">
+        <label>Korwil</label>
+        <select id="f1Korwil" class="form-select form-select-sm"></select>
+      </div>
+    </div>
+  </div>
+
+  <!-- Scorecards -->
+  <div class="row g-3 mb-3" id="scorecards"></div>
+
+  <!-- Heatmap -->
+  <div class="section-title">Heatmap Status ALPS — Provinsi × Komoditas</div>
+  <div class="legend-bar">
+    <span><span class="swatch" style="background:var(--alps-normal)"></span>Normal</span>
+    <span><span class="swatch" style="background:var(--alps-stress)"></span>Stress</span>
+    <span><span class="swatch" style="background:var(--alps-alert)"></span>Alert</span>
+    <span><span class="swatch" style="background:var(--alps-crisis)"></span>Crisis</span>
+    <span><span class="swatch" style="background:#e2e8f0"></span>Tidak ada data</span>
+  </div>
+  <div class="chart-box" style="overflow-x:auto;">
+    <div id="heatmapChart" style="min-width:900px; height:820px;"></div>
+  </div>
+
+  <!-- Top 10 -->
+  <div class="section-title">Top 10 Kombinasi dengan ALPS Score Tertinggi</div>
+  <div class="chart-box">
+    <div id="top10Chart" style="height:380px;"></div>
+  </div>
+</div>
+
+<!-- ==================== TAB 2: Detail Provinsi-Komoditas ==================== -->
+<div class="tab-pane fade" id="tab2" role="tabpanel">
+
+  <div class="filter-bar">
+    <div class="row g-3 align-items-end">
+      <div class="col-auto">
+        <label>Provinsi</label>
+        <select id="f2Prov" class="form-select form-select-sm"></select>
+      </div>
+      <div class="col-auto">
+        <label>Komoditas</label>
+        <select id="f2Kom" class="form-select form-select-sm"></select>
+      </div>
+      <div class="col-auto">
+        <label>Jenis Pasar</label>
+        <select id="f2Pasar" class="form-select form-select-sm">
+          <option>Pasar Tradisional</option>
+          <option>Pasar Modern</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Harga Aktual vs Estimasi Tren Musiman</div>
+  <p class="text-muted" style="font-size:0.82rem;">Garis biru = harga aktual · Garis abu-abu putus-putus = estimasi OLS · Latar warna = status ALPS</p>
+  <div class="chart-box">
+    <div id="priceChart" style="height:380px;"></div>
+  </div>
+
+  <div class="section-title">ALPS Score Time Series</div>
+  <p class="text-muted" style="font-size:0.82rem;">Garis horizontal putus-putus = batas threshold (0.25 / 1.0 / 2.0)</p>
+  <div class="chart-box">
+    <div id="alpsChart" style="height:300px;"></div>
+  </div>
+
+  <div class="row">
+    <div class="col-lg-6">
+      <div class="section-title">Statistik Ringkasan</div>
+      <div class="chart-box">
+        <table class="table summary-tbl mb-0" id="summaryTable"></table>
+      </div>
+    </div>
+    <div class="col-lg-6 d-flex align-items-end pb-3">
+      <button class="btn btn-primary btn-dl" id="btnDownload"><i class="bi bi-download me-1"></i>Unduh CSV Data Terpilih</button>
+    </div>
+  </div>
+</div>
+
+<!-- ==================== TAB 3: Perbandingan ==================== -->
+<div class="tab-pane fade" id="tab3" role="tabpanel">
+
+  <div class="filter-bar">
+    <div class="row g-3 align-items-end">
+      <div class="col-auto">
+        <label>Komoditas</label>
+        <select id="f3Kom" class="form-select form-select-sm"></select>
+      </div>
+      <div class="col-auto">
+        <label>Jenis Pasar</label>
+        <select id="f3Pasar" class="form-select form-select-sm">
+          <option>Pasar Tradisional</option>
+          <option>Pasar Modern</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  <div class="section-title">Peta Status ALPS Bulan Terakhir — Per Provinsi</div>
+  <div class="legend-bar">
+    <span><span class="swatch" style="background:var(--alps-normal)"></span>Normal</span>
+    <span><span class="swatch" style="background:var(--alps-stress)"></span>Stress</span>
+    <span><span class="swatch" style="background:var(--alps-alert)"></span>Alert</span>
+    <span><span class="swatch" style="background:var(--alps-crisis)"></span>Crisis</span>
+    <span><span class="swatch" style="background:#e2e8f0"></span>Tidak ada data</span>
+  </div>
+  <div id="tileMap"></div>
+
+  <div class="section-title">Small Multiples — ALPS Score per Provinsi</div>
+  <p class="text-muted" style="font-size:0.82rem;">Setiap panel = satu provinsi. Garis horizontal = threshold. Latar warna = zona ALPS.</p>
+  <div id="smallMultiples" class="row g-2"></div>
+</div>
+
+<!-- ==================== TAB 4: Metodologi ==================== -->
+<div class="tab-pane fade" id="tab4" role="tabpanel">
+  <div class="method-box mt-3">
+    <h4 class="fw-bold mb-3">Metodologi ALPS (Alert for Price Spikes)</h4>
+    <p>ALPS adalah metode <em>early warning</em> yang dikembangkan oleh <strong>World Food Programme (WFP)</strong>
+    untuk mendeteksi lonjakan harga pangan yang tidak normal.</p>
+
+    <h5>Langkah Perhitungan</h5>
+    <ol>
+      <li><strong>Estimasi Tren Musiman (OLS):</strong> Untuk setiap kombinasi provinsi × komoditas × jenis pasar,
+      diestimasi model dengan <em>expanding window</em>:
+        $$\text{Harga}_t = \alpha \cdot T + \sum_{m=1}^{12} \beta_m \cdot D_{m} + \varepsilon_t$$
+      </li>
+      <li><strong>Hitung Residual:</strong> Hanya residual positif (harga aktual &gt; estimasi) yang digunakan.</li>
+      <li><strong>Normalisasi:</strong> ALPS Score = residual positif / σ residual positif historis.</li>
+      <li><strong>Klasifikasi:</strong>
+        <ul>
+          <li><span class="badge-alps badge-Normal">Normal</span> ALPS &lt; 0.25</li>
+          <li><span class="badge-alps badge-Stress">Stress</span> 0.25 ≤ ALPS &lt; 1</li>
+          <li><span class="badge-alps badge-Alert">Alert</span> 1 ≤ ALPS &lt; 2</li>
+          <li><span class="badge-alps badge-Crisis">Crisis</span> ALPS ≥ 2</li>
+        </ul>
+      </li>
+    </ol>
+
+    <h5>Cara Membaca Dashboard</h5>
+    <ul>
+      <li><strong>Heatmap</strong> — gambaran umum semua provinsi × komoditas. Merah = perlu perhatian.</li>
+      <li><strong>Time series</strong> — evolusi harga dan ALPS score. Apakah lonjakan sementara atau tren?</li>
+      <li><strong>Small multiples</strong> — pemindaian cepat semua provinsi untuk satu komoditas.</li>
+    </ul>
+
+    <h5>Sumber Data</h5>
+    <p>Pusat Informasi Harga Pangan Strategis Nasional (PIHPS) — 34 provinsi, 10 komoditas, 2 jenis pasar. Periode: Januari 2021 — sekarang.</p>
+
+    <h5>Referensi</h5>
+    <p>WFP. (2014). <em>Alert for Price Spikes (ALPS): Technical Guidance Note.</em> VAM, Rome.</p>
+  </div>
+</div>
+
+</div><!-- /tab-content -->
+</div><!-- /container -->
+
+<!-- Footer -->
+<div class="footer-alps mt-4">
+  Dashboard ALPS — Sistem Peringatan Dini Lonjakan Harga Pangan · Metode ALPS (WFP, 2014)
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+// ===================== GLOBALS =====================
+let DATA = [];
+const KORWIL_ORDER = ["Jawa", "Sumatera", "Balinusra", "Kalimantan", "Sulampua"];
+const KORWIL_MAP = {
+  "Aceh":"Sumatera","Sumatera Utara":"Sumatera","Sumatera Barat":"Sumatera","Riau":"Sumatera","Jambi":"Sumatera",
+  "Sumatera Selatan":"Sumatera","Bengkulu":"Sumatera","Lampung":"Sumatera","Kepulauan Bangka Belitung":"Sumatera","Kepulauan Riau":"Sumatera",
+  "DKI Jakarta":"Jawa","Jawa Barat":"Jawa","Jawa Tengah":"Jawa","DI Yogyakarta":"Jawa","Jawa Timur":"Jawa","Banten":"Jawa",
+  "Bali":"Balinusra","Nusa Tenggara Barat":"Balinusra","Nusa Tenggara Timur":"Balinusra",
+  "Kalimantan Barat":"Kalimantan","Kalimantan Tengah":"Kalimantan","Kalimantan Selatan":"Kalimantan","Kalimantan Timur":"Kalimantan","Kalimantan Utara":"Kalimantan",
+  "Sulawesi Utara":"Sulampua","Sulawesi Tengah":"Sulampua","Sulawesi Selatan":"Sulampua","Sulawesi Tenggara":"Sulampua",
+  "Gorontalo":"Sulampua","Sulawesi Barat":"Sulampua","Maluku":"Sulampua","Maluku Utara":"Sulampua","Papua":"Sulampua","Papua Barat":"Sulampua"
+};
+
+const COLORS = { Normal:"#22c55e", Stress:"#eab308", Alert:"#f97316", Crisis:"#ef4444" };
+const statusColor = s => COLORS[s] || "#e2e8f0";
+const fmtH = v => v == null ? "—" : Number(v).toLocaleString("id-ID");
+const fmtS = v => v == null ? "—" : Number(v).toFixed(2);
+const BULAN = ["","Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
+
+// Unique sorted
+const uniq = (arr) => [...new Set(arr)].sort();
+
+// ===================== LOAD DATA =====================
+Papa.parse("alps_output.csv", {
+  download: true, header: true, skipEmptyLines: true,
+  complete: function(results) {
+    DATA = results.data.map(d => ({
+      ...d,
+      tahun: +d.tahun, bulan: +d.bulan,
+      harga: d.harga === "" ? null : +d.harga,
+      harga_estimasi: d.harga_estimasi === "" ? null : +d.harga_estimasi,
+      alps_score: d.alps_score === "" ? null : +d.alps_score,
+      korwil: d.korwil || KORWIL_MAP[d.provinsi] || ""
+    })).filter(d => d.harga != null);
+
+    initApp();
+    document.getElementById("loading").style.display = "none";
+  }
+});
+
+// ===================== INIT =====================
+function initApp() {
+  const allProv = uniq(DATA.map(d => d.provinsi));
+  const allKom = uniq(DATA.map(d => d.komoditas));
+  const allDates = uniq(DATA.map(d => d.date)).sort().reverse();
+  const allKorwil = ["Semua", ...uniq(DATA.map(d => d.korwil).filter(Boolean))];
+
+  // Populate dropdowns
+  fillSelect("f1Period", allDates.map(d => {
+    const row = DATA.find(r => r.date === d);
+    return { value: d, label: row ? `${BULAN[row.bulan]} ${row.tahun}` : d };
+  }));
+  fillSelect("f1Korwil", allKorwil.map(d => ({ value: d, label: d })));
+  fillSelect("f2Prov", allProv.map(d => ({ value: d, label: d })));
+  fillSelect("f2Kom", allKom.map(d => ({ value: d, label: d })));
+  fillSelect("f3Kom", allKom.map(d => ({ value: d, label: d })));
+
+  // Event listeners
+  ["f1Period","f1Pasar","f1Korwil"].forEach(id => document.getElementById(id).addEventListener("change", renderTab1));
+  ["f2Prov","f2Kom","f2Pasar"].forEach(id => document.getElementById(id).addEventListener("change", renderTab2));
+  ["f3Kom","f3Pasar"].forEach(id => document.getElementById(id).addEventListener("change", renderTab3));
+
+  document.getElementById("btnDownload").addEventListener("click", downloadFiltered);
+
+  // Render on tab show
+  document.querySelectorAll('[data-bs-toggle="tab"]').forEach(el => {
+    el.addEventListener("shown.bs.tab", e => {
+      const t = e.target.getAttribute("href");
+      if (t === "#tab1") renderTab1();
+      if (t === "#tab2") renderTab2();
+      if (t === "#tab3") renderTab3();
+    });
+  });
+
+  renderTab1();
+}
+
+function fillSelect(id, items) {
+  const sel = document.getElementById(id);
+  sel.innerHTML = items.map(d => `<option value="${d.value}">${d.label}</option>`).join("");
+}
+
+// ===================== TAB 1: RINGKASAN NASIONAL =====================
+let heatmapInstance, top10Instance;
+
+function renderTab1() {
+  const date = document.getElementById("f1Period").value;
+  const pasar = document.getElementById("f1Pasar").value;
+  const korwil = document.getElementById("f1Korwil").value;
+
+  let rows = DATA.filter(d => d.date === date && d.status);
+  if (pasar !== "Semua") rows = rows.filter(d => d.jenis_pasar === pasar);
+  if (korwil !== "Semua") rows = rows.filter(d => d.korwil === korwil);
+
+  // Scorecards
+  const cnt = { Normal:0, Stress:0, Alert:0, Crisis:0 };
+  rows.forEach(d => { if (cnt[d.status] !== undefined) cnt[d.status]++; });
+  const total = Object.values(cnt).reduce((a,b) => a+b, 0);
+  const pct = v => total ? (v/total*100).toFixed(1) : "0";
+
+  document.getElementById("scorecards").innerHTML = [
+    ["Normal","normal","#22c55e"], ["Stress","stress","#eab308"], ["Alert","alert","#f97316"], ["Crisis","crisis","#ef4444"]
+  ].map(([s, cls, col]) =>
+    `<div class="col-6 col-md-3"><div class="score-card card-${cls}">
+      <div class="val" style="color:${col}">${cnt[s]}</div>
+      <div class="lbl">${s}</div><div class="pct">${pct(cnt[s])}%</div>
+    </div></div>`
+  ).join("");
+
+  // Heatmap
+  renderHeatmap(rows);
+  renderTop10(rows);
+}
+
+function renderHeatmap(rows) {
+  const allKom = uniq(DATA.map(d => d.komoditas));
+
+  // Build lookup — worst status per prov×komoditas
+  const lookup = {};
+  const rank = { Crisis:4, Alert:3, Stress:2, Normal:1 };
+  rows.forEach(d => {
+    const key = `${d.provinsi}|${d.komoditas}`;
+    if (!lookup[key] || (rank[d.status]||0) > (rank[lookup[key].status]||0)) lookup[key] = d;
+  });
+
+  // Provinces grouped by korwil
+  const provs = [];
+  KORWIL_ORDER.forEach(k => {
+    const ps = uniq(rows.filter(d => d.korwil === k).map(d => d.provinsi));
+    ps.forEach(p => provs.push(p));
+  });
+
+  // ECharts heatmap data
+  const heatData = [];
+  provs.forEach((p, yi) => {
+    allKom.forEach((k, xi) => {
+      const d = lookup[`${p}|${k}`];
+      const val = d ? (rank[d.status] || 0) : 0;
+      heatData.push([xi, yi, val, d ? d.status : "N/A", d ? d.harga : null, d ? d.alps_score : null, p, k]);
+    });
+  });
+
+  const el = document.getElementById("heatmapChart");
+  el.style.height = Math.max(600, provs.length * 24 + 120) + "px";
+  if (heatmapInstance) heatmapInstance.dispose();
+  heatmapInstance = echarts.init(el);
+
+  heatmapInstance.setOption({
+    tooltip: {
+      formatter: p => {
+        const [,,, status, harga, alps, prov, kom] = p.data;
+        return `<strong>${prov}</strong> — ${kom}<br/>
+          Harga: Rp ${fmtH(harga)}<br/>
+          ALPS: ${fmtS(alps)}<br/>
+          Status: <strong>${status}</strong>`;
+      }
+    },
+    grid: { left: 180, right: 20, top: 90, bottom: 20 },
+    xAxis: {
+      type: "category", data: allKom, position: "top",
+      axisLabel: { rotate: 40, fontSize: 11, color: "#475569" },
+      axisTick: { show: false }, axisLine: { show: false }
+    },
+    yAxis: {
+      type: "category", data: provs, inverse: true,
+      axisLabel: { fontSize: 11, color: "#334155" },
+      axisTick: { show: false }, axisLine: { show: false }
+    },
+    visualMap: {
+      show: false, min: 0, max: 4,
+      inRange: { color: ["#f1f5f9", "#22c55e", "#eab308", "#f97316", "#ef4444"] }
+    },
+    series: [{
+      type: "heatmap", data: heatData.map(d => [d[0], d[1], d[2]]),
+      itemStyle: { borderRadius: 3, borderWidth: 1, borderColor: "#fff" },
+      label: { show: false },
+      emphasis: { itemStyle: { shadowBlur: 6, shadowColor: "rgba(0,0,0,0.2)" } }
+    }]
+  });
+
+  // Attach full data for tooltip
+  heatmapInstance.setOption({
+    series: [{ data: heatData.map(d => ({ value: d.slice(0, 3), data: d })) }],
+    tooltip: {
+      formatter: p => {
+        const d = p.data.data || p.data;
+        return `<strong>${d[6]}</strong> — ${d[7]}<br/>Harga: Rp ${fmtH(d[4])}<br/>ALPS: ${fmtS(d[5])}<br/>Status: <strong>${d[3]}</strong>`;
+      }
+    }
+  });
+}
+
+function renderTop10(rows) {
+  const sorted = rows.filter(d => d.alps_score != null).sort((a,b) => b.alps_score - a.alps_score).slice(0, 10).reverse();
+  const labels = sorted.map(d => `${d.provinsi} — ${d.komoditas}`);
+  const values = sorted.map(d => d.alps_score);
+  const colors = sorted.map(d => statusColor(d.status));
+
+  const el = document.getElementById("top10Chart");
+  if (top10Instance) top10Instance.dispose();
+  top10Instance = echarts.init(el);
+
+  top10Instance.setOption({
+    tooltip: { trigger: "axis", axisPointer: { type: "shadow" },
+      formatter: p => `${p[0].name}<br/>ALPS Score: <strong>${p[0].value.toFixed(2)}</strong>` },
+    grid: { left: 240, right: 70, top: 10, bottom: 20 },
+    xAxis: { type: "value", name: "ALPS Score",
+      splitLine: { lineStyle: { type: "dashed" } } },
+    yAxis: { type: "category", data: labels, axisLabel: { fontSize: 11 } },
+    series: [{
+      type: "bar", data: values.map((v, i) => ({ value: v, itemStyle: { color: colors[i], borderRadius: [0,4,4,0] } })),
+      barWidth: "60%",
+      label: { show: true, position: "right", formatter: p => p.value.toFixed(2), fontWeight: 700, fontSize: 12 },
+      markLine: {
+        silent: true, symbol: "none",
+        lineStyle: { type: "dashed", width: 1 },
+        data: [
+          { xAxis: 0.25, lineStyle: { color: "#eab308" } },
+          { xAxis: 1, lineStyle: { color: "#f97316" } },
+          { xAxis: 2, lineStyle: { color: "#ef4444" } }
+        ]
+      }
+    }]
+  });
+}
+
+// ===================== TAB 2: DETAIL =====================
+let priceInstance, alpsInstance;
+
+function renderTab2() {
+  const prov = document.getElementById("f2Prov").value;
+  const kom = document.getElementById("f2Kom").value;
+  const pasar = document.getElementById("f2Pasar").value;
+
+  const series = DATA.filter(d => d.provinsi === prov && d.komoditas === kom && d.jenis_pasar === pasar)
+    .sort((a,b) => a.date.localeCompare(b.date));
+
+  renderPriceChart(series);
+  renderAlpsChart(series);
+  renderSummary(series, prov, kom, pasar);
+}
+
+function renderPriceChart(series) {
+  const dates = series.map(d => `${BULAN[d.bulan].slice(0,3)} ${d.tahun}`);
+  const actual = series.map(d => d.harga);
+  const est = series.map(d => d.harga_estimasi);
+
+  // Build markArea data: contiguous runs of same status
+  const areas = [];
+  if (series.length) {
+    let runStart = 0;
+    for (let i = 1; i <= series.length; i++) {
+      if (i === series.length || series[i].status !== series[runStart].status) {
+        const st = series[runStart].status;
+        areas.push([{
+          xAxis: dates[runStart],
+          itemStyle: { color: statusColor(st), opacity: 0.13 }
+        }, {
+          xAxis: dates[i - 1]
+        }]);
+        runStart = i;
+      }
+    }
+  }
+
+  const el = document.getElementById("priceChart");
+  if (priceInstance) priceInstance.dispose();
+  priceInstance = echarts.init(el);
+
+  priceInstance.setOption({
+    tooltip: {
+      trigger: "axis",
+      formatter: ps => {
+        const i = ps[0].dataIndex;
+        const d = series[i];
+        return `<strong>${BULAN[d.bulan]} ${d.tahun}</strong><br/>
+          Harga: Rp ${fmtH(d.harga)}<br/>
+          Estimasi: Rp ${fmtH(d.harga_estimasi)}<br/>
+          ALPS: ${fmtS(d.alps_score)}<br/>
+          Status: ${d.status || "—"}`;
+      }
+    },
+    grid: { left: 80, right: 30, top: 30, bottom: 40 },
+    xAxis: { type: "category", data: dates, axisLabel: { rotate: 45, fontSize: 10 }, boundaryGap: true },
+    yAxis: {
+      type: "value", axisLabel: { formatter: v => `${(v/1000).toFixed(0)}rb` },
+      splitLine: { lineStyle: { type: "dashed" } }
+    },
+    series: [
+      {
+        name: "Harga Aktual", type: "line", data: actual,
+        lineStyle: { color: "#3b82f6", width: 2.5 },
+        itemStyle: { color: "#3b82f6" }, symbol: "circle", symbolSize: 5, z: 3,
+        markArea: { silent: true, data: areas }
+      },
+      {
+        name: "Estimasi", type: "line", data: est,
+        lineStyle: { color: "#94a3b8", width: 1.5, type: "dashed" },
+        itemStyle: { color: "#94a3b8" }, symbol: "none", z: 2
+      }
+    ]
+  });
+}
+
+function renderAlpsChart(series) {
+  const s = series.filter(d => d.alps_score != null);
+  const dates = s.map(d => `${BULAN[d.bulan].slice(0,3)} ${d.tahun}`);
+  const scores = s.map(d => d.alps_score);
+  const colors = s.map(d => statusColor(d.status));
+
+  const el = document.getElementById("alpsChart");
+  if (alpsInstance) alpsInstance.dispose();
+  alpsInstance = echarts.init(el);
+
+  const maxY = Math.max(3, ...scores.map(v => v * 1.15));
+
+  alpsInstance.setOption({
+    tooltip: {
+      trigger: "axis",
+      formatter: ps => {
+        const i = ps[0].dataIndex;
+        const d = s[i];
+        return `<strong>${BULAN[d.bulan]} ${d.tahun}</strong><br/>ALPS: ${fmtS(d.alps_score)}<br/>Status: ${d.status}`;
+      }
+    },
+    grid: { left: 55, right: 30, top: 20, bottom: 40 },
+    xAxis: { type: "category", data: dates, axisLabel: { rotate: 45, fontSize: 10 }, boundaryGap: false },
+    yAxis: { type: "value", max: maxY, splitLine: { lineStyle: { type: "dashed" } } },
+    series: [
+      // Zone areas
+      { type: "line", data: dates.map(() => 0.25), lineStyle: { width: 0 }, areaStyle: { color: "#22c55e", opacity: 0.06 }, symbol: "none", silent: true, z: 0, tooltip: { show: false } },
+      { type: "line", data: dates.map(() => 1), lineStyle: { width: 0 }, areaStyle: { color: "#eab308", opacity: 0.06 }, symbol: "none", silent: true, z: 0, tooltip: { show: false } },
+      { type: "line", data: dates.map(() => 2), lineStyle: { width: 0 }, areaStyle: { color: "#f97316", opacity: 0.06 }, symbol: "none", silent: true, z: 0, tooltip: { show: false } },
+      { type: "line", data: dates.map(() => maxY), lineStyle: { width: 0 }, areaStyle: { color: "#ef4444", opacity: 0.06 }, symbol: "none", silent: true, z: 0, tooltip: { show: false } },
+      {
+        name: "ALPS", type: "line", data: scores, z: 3,
+        lineStyle: { color: "#1e293b", width: 2.2 },
+        itemStyle: { color: p => colors[p.dataIndex] || "#1e293b" },
+        symbol: "circle", symbolSize: 7,
+        markLine: {
+          silent: true, symbol: "none",
+          lineStyle: { type: "dashed", width: 1 },
+          label: { position: "insideEndTop", fontSize: 10 },
+          data: [
+            { yAxis: 0.25, lineStyle: { color: "#eab308" }, label: { formatter: "0.25", color: "#eab308" } },
+            { yAxis: 1, lineStyle: { color: "#f97316" }, label: { formatter: "1.0", color: "#f97316" } },
+            { yAxis: 2, lineStyle: { color: "#ef4444" }, label: { formatter: "2.0", color: "#ef4444" } }
+          ]
+        }
+      }
+    ]
+  });
+}
+
+function renderSummary(series, prov, kom, pasar) {
+  const prices = series.map(d => d.harga).filter(d => d != null);
+  const avg = prices.length ? prices.reduce((a,b)=>a+b,0)/prices.length : null;
+  const sd = prices.length > 1 ? Math.sqrt(prices.reduce((s,v) => s + (v-avg)**2, 0) / (prices.length-1)) : null;
+  const last = series[series.length - 1];
+  const lastA = last?.alps_score;
+  const lastS = last?.status || "—";
+  const last12 = series.slice(-12);
+  const ac = last12.filter(d => d.status === "Alert" || d.status === "Crisis").length;
+
+  document.getElementById("summaryTable").innerHTML = `
+    <tr><th>Indikator</th><th>Nilai</th></tr>
+    <tr><td>Provinsi</td><td><strong>${prov}</strong></td></tr>
+    <tr><td>Komoditas</td><td><strong>${kom}</strong></td></tr>
+    <tr><td>Jenis Pasar</td><td>${pasar}</td></tr>
+    <tr><td>Rata-rata Harga</td><td>Rp ${fmtH(avg?.toFixed(0))}</td></tr>
+    <tr><td>Std. Deviasi Harga</td><td>Rp ${fmtH(sd?.toFixed(0))}</td></tr>
+    <tr><td>ALPS Score Terakhir</td><td><strong>${fmtS(lastA)}</strong></td></tr>
+    <tr><td>Status Terakhir</td><td><span class="badge-alps badge-${lastS}">${lastS}</span></td></tr>
+    <tr><td>Bulan Alert/Crisis (12 bln)</td><td><strong>${ac}</strong> dari ${Math.min(12, last12.length)}</td></tr>
+    <tr><td>Observasi</td><td>${series.length} bulan</td></tr>`;
+}
+
+function downloadFiltered() {
+  const prov = document.getElementById("f2Prov").value;
+  const kom = document.getElementById("f2Kom").value;
+  const pasar = document.getElementById("f2Pasar").value;
+  const series = DATA.filter(d => d.provinsi === prov && d.komoditas === kom && d.jenis_pasar === pasar);
+
+  const header = "tahun,bulan,bulan_nama,date,provinsi,korwil,komoditas,jenis_pasar,harga,harga_estimasi,alps_score,status";
+  const csv = [header, ...series.map(d =>
+    [d.tahun,d.bulan,d.bulan_nama,d.date,d.provinsi,d.korwil,d.komoditas,d.jenis_pasar,d.harga,d.harga_estimasi,d.alps_score,d.status].join(",")
+  )].join("\n");
+
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `alps_${prov.replace(/\s/g,"_")}_${kom.replace(/\s/g,"_")}.csv`;
+  a.click();
+}
+
+// ===================== TAB 3: PERBANDINGAN =====================
+function renderTab3() {
+  const kom = document.getElementById("f3Kom").value;
+  const pasar = document.getElementById("f3Pasar").value;
+  const allDates = uniq(DATA.map(d => d.date)).sort();
+  const latestDate = allDates[allDates.length - 1];
+
+  // Tile map
+  const latest = DATA.filter(d => d.date === latestDate && d.komoditas === kom && d.jenis_pasar === pasar && d.status);
+  const lookup = {};
+  latest.forEach(d => { lookup[d.provinsi] = d; });
+
+  const allProv = uniq(DATA.map(d => d.provinsi));
+  const shorten = s => s.replace("Kalimantan ","Kal. ").replace("Sulawesi ","Sul. ").replace("Sumatera ","Sum. ")
+    .replace("Nusa Tenggara ","NT ").replace("Kepulauan ","Kep. ").replace("DI Yogyakarta","DIY");
+
+  let tileHtml = "";
+  KORWIL_ORDER.forEach(k => {
+    const provs = allProv.filter(p => (KORWIL_MAP[p] || "") === k).sort();
+    if (!provs.length) return;
+    tileHtml += `<div class="korwil-label">${k}</div><div class="tile-grid">`;
+    provs.forEach(p => {
+      const d = lookup[p];
+      const st = d?.status || "N/A";
+      const bg = statusColor(st);
+      const tc = st === "Stress" ? "#1e293b" : "#fff";
+      tileHtml += `<div class="tile-cell" style="background:${bg};color:${tc};" title="${p}\nHarga: Rp ${fmtH(d?.harga)}\nALPS: ${fmtS(d?.alps_score)}\nStatus: ${st}">
+        <span>${shorten(p)}</span><span class="sc">${fmtS(d?.alps_score)}</span></div>`;
+    });
+    tileHtml += `</div>`;
+  });
+  document.getElementById("tileMap").innerHTML = tileHtml;
+
+  // Small multiples
+  const subset = DATA.filter(d => d.komoditas === kom && d.jenis_pasar === pasar && d.alps_score != null);
+  const provOrder = [];
+  KORWIL_ORDER.forEach(k => {
+    allProv.filter(p => (KORWIL_MAP[p]||"") === k).sort().forEach(p => provOrder.push(p));
+  });
+  const provsWithData = new Set(subset.map(d => d.provinsi));
+  const filteredProv = provOrder.filter(p => provsWithData.has(p));
+
+  let smHtml = "";
+  filteredProv.forEach(p => {
+    smHtml += `<div class="col-6 col-md-4 col-lg-3"><div class="chart-box p-2" style="height:130px;" id="sm_${p.replace(/\s/g,"_")}">
+      <div style="font-size:0.72rem;font-weight:700;color:#475569;margin-bottom:2px;">${shorten(p)}</div>
+    </div></div>`;
+  });
+  document.getElementById("smallMultiples").innerHTML = smHtml;
+
+  // Render each small chart
+  setTimeout(() => {
+    filteredProv.forEach(p => {
+      const el = document.getElementById(`sm_${p.replace(/\s/g,"_")}`);
+      if (!el) return;
+      const ch = echarts.init(el);
+      const ps = subset.filter(d => d.provinsi === p).sort((a,b) => a.date.localeCompare(b.date));
+      const dates = ps.map(d => d.date);
+      const scores = ps.map(d => Math.min(d.alps_score, 5));
+      const maxY = 4;
+
+      ch.setOption({
+        grid: { left: 28, right: 6, top: 16, bottom: 4 },
+        xAxis: { type: "category", data: dates, show: false },
+        yAxis: { type: "value", max: maxY, show: false,
+          splitLine: { show: false } },
+        tooltip: { trigger: "axis", formatter: pp => {
+          const d = ps[pp[0].dataIndex];
+          return `${BULAN[d.bulan]} ${d.tahun}<br/>ALPS: ${fmtS(d.alps_score)}<br/>Status: ${d.status}`;
+        }},
+        series: [
+          // Zone bg
+          { type: "line", data: dates.map(()=>0.25), areaStyle:{color:"#22c55e",opacity:0.08}, lineStyle:{width:0}, symbol:"none", silent:true, z:0, tooltip:{show:false} },
+          { type: "line", data: dates.map(()=>1), areaStyle:{color:"#eab308",opacity:0.08}, lineStyle:{width:0}, symbol:"none", silent:true, z:0, tooltip:{show:false} },
+          { type: "line", data: dates.map(()=>2), areaStyle:{color:"#f97316",opacity:0.08}, lineStyle:{width:0}, symbol:"none", silent:true, z:0, tooltip:{show:false} },
+          { type: "line", data: dates.map(()=>maxY), areaStyle:{color:"#ef4444",opacity:0.08}, lineStyle:{width:0}, symbol:"none", silent:true, z:0, tooltip:{show:false} },
+          {
+            type: "line", data: scores, z: 3,
+            lineStyle: { color: "#1e293b", width: 1.3 },
+            itemStyle: { color: "#1e293b" }, symbol: "none",
+            markLine: { silent:true, symbol:"none", lineStyle:{type:"dashed",width:0.5,color:"#94a3b8"},
+              data: [{yAxis:0.25},{yAxis:1},{yAxis:2}], label:{show:false} }
+          }
+        ]
+      });
+    });
+  }, 100);
+}
+
+// ===================== RESIZE =====================
+window.addEventListener("resize", () => {
+  [heatmapInstance, top10Instance, priceInstance, alpsInstance].forEach(c => c?.resize());
+});
+</script>
+</body>
+</html>
